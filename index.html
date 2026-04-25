@@ -669,7 +669,14 @@
         }
 
         function getColor(courseId) {
-            return playedCourses.has(courseId) ? '#3fb950' : '#f85149';
+            const rating = courseRatings[courseId] || 0;
+            if (rating === 0) return playedCourses.has(courseId) ? '#3fb950' : '#f85149';
+            // 10/10 = tmavě zelená #1a4d2e, 1/10 = světle zelená #b7e4c7
+            const t = rating / 10;
+            const r = Math.round(183 - t * (183 - 26));
+            const g = Math.round(228 - t * (228 - 77));
+            const b = Math.round(199 - t * (199 - 46));
+            return `rgb(${r},${g},${b})`;
         }
 
         function addMarkers() {
