@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golf Courses Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-dark: #0f1117;
+            --bg-darker: #010409;
+            --bg-card: #161b22;
+            --bg-input: #0d1117;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border: #30363d;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --success: #3fb950;
+            --danger: #f85149;
+            --warning: #d29922;
+        }
+        
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+            background: var(--bg-darker);
+        }
+        
+        /* Dark Leaflet theme */
+        .leaflet-tile {
+            filter: brightness(0.8) contrast(1.1);
+        }
+        
+        /* Top Left Panel */
+        .sidebar {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            z-index: 1000;
+            max-width: 360px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 2px;
+        }
+        
+        .sidebar-header p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .sidebar-content {
+            padding: 20px;
+        }
+        
+        .search-wrapper {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.1);
+            background: var(--bg-card);
+        }
+        
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        /* Filter Section */
+        .filter-section {
+            margin-bottom: 24px;
+        }
+        
+        .filter-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .filter-tabs {
+            display: flex;
+            gap: 6px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+        
+        .filter-tab {
+            padding: 6px 12px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            margin-bottom: -9px;
+        }
+        
+        .filter-tab:hover {
+            color: var(--accent);
+        }
+        
+        .filter-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .stat-box {
+            background: var(--bg-input);
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+        }
+        
+        .stat-box:hover {
+            border-color: var(--accent);
+            background: rgba(88, 166, 255, 0.05);
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .stat-percent {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        
+        .stat-box.success {
+            border-color: rgba(63, 185, 80, 0.3);
+            background: rgba(63, 185, 80, 0.05);
+        }
+        
+        .stat-box.success .stat-value {
+            color: var(--success);
+        }
+        
+        .stat-box.danger {
+            border-color: rgba(248, 81, 73, 0.3);
+            background: rgba(248, 81, 73, 0.05);
+        }
+        
+        .stat-box.danger .stat-value {
+            color: var(--danger);
+        }
+        
+        /* Bottom Info Panel */
+        .info-panel {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+            z-index: 500;
+            max-height: 50vh;
+            overflow-y: auto;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+        }
+        
+        .info-panel.active {
+            transform: translateY(0);
+        }
+        
+        .info-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .info-title {
+            flex: 1;
+        }
+        
+        .info-title h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        
+        .info-title p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .close-btn:hover {
+            color: var(--accent);
+        }
+        
+        .info-content {
+            padding: 20px;
+        }
+        
+        .info-row {
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .info-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: var(--text-primary);
+            text-align: right;
+        }
+        
+        .info-row a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        
+        .info-row a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        
+        .info-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 16px 0;
+        }
+        
+        .action-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+        
+        .btn:hover {
+            border-color: var(--accent);
+            background: rgba(88, 166, 255, 0.05);
+            color: var(--accent);
+        }
+        
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+        }
+        
+        .checkbox-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        
+        .checkbox-row label {
+            font-size: 13px;
+            color: var(--text-primary);
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        /* Rating Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-card);
+            box-shadow: 0 2px 4px rgba(88, 166, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(88, 166, 255, 0.5);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-card);
+            box-shadow: 0 2px 4px rgba(88, 166, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(88, 166, 255, 0.5);
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            z-index: 1000;
+            font-size: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+        
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1.5px solid #333;
+            flex-shrink: 0;
+        }
+        
+        .legend-dot.played {
+            background: var(--success);
+            border-color: rgba(63, 185, 80, 0.6);
+        }
+        
+        .legend-dot.unplayed {
+            background: var(--danger);
+            border-color: rgba(248, 81, 73, 0.6);
+        }
+        
+        /* Scrollbar styling */
+        .info-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .info-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .info-panel::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        
+        .info-panel::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+        
+        /* Responsive */
+        @media (max-width: 640px) {
+            .sidebar {
+                max-width: calc(100% - 32px);
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .info-panel {
+                max-height: 60vh;
+            }
+            
+            .filter-tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <!-- Left Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1>Golf Courses</h1>
+            <p>Czech Republic</p>
+        </div>
+        <div class="sidebar-content">
+            <!-- Search -->
+            <div class="search-wrapper">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="Search courses..."
+                >
+            </div>
+            
+            <!-- Filter -->
+            <div class="filter-section">
+                <label class="filter-label">Filter</label>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All</button>
+                    <button class="filter-tab" data-filter="played">Played</button>
+                    <button class="filter-tab" data-filter="unplayed">Unplayed</button>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="filter-section">
+                <label class="filter-label">Statistics</label>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Total</div>
+                        <div class="stat-value" id="totalCourses">0</div>
+                    </div>
+                    <div class="stat-box success">
+                        <div class="stat-label">Played</div>
+                        <div class="stat-value" id="playedCourses">0</div>
+                        <div class="stat-percent" id="playedPercent">0%</div>
+                    </div>
+                    <div class="stat-box danger">
+                        <div class="stat-label">Remaining</div>
+                        <div class="stat-value" id="unplayedCourses">0</div>
+                        <div class="stat-percent" id="unplayedPercent">0%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Progress</div>
+                        <div class="stat-value" id="playedPercentage">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-dot played"></div>
+            <span>Played</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot unplayed"></div>
+            <span>Unplayed</span>
+        </div>
+    </div>
+    
+    <!-- Bottom Info Panel -->
+    <div class="info-panel" id="infoPanel">
+        <div class="info-header">
+            <div class="info-title">
+                <h2 id="courseName">-</h2>
+                <p><span id="courseRegion">-</span> • <span id="courseHoles">-</span> holes</p>
+            </div>
+            <button class="close-btn" onclick="closeInfo()">×</button>
+        </div>
+        <div class="info-content">
+            <div class="info-row">
+                <span class="info-label">Rating:</span>
+                <span class="info-value" id="courseRating">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Location:</span>
+                <span class="info-value" id="courseLocation">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Website:</span>
+                <a id="courseWebLink" href="#" target="_blank">Visit</a>
+            </div>
+            
+            <div class="info-divider"></div>
+            
+            <div class="action-group">
+                <button class="btn" onclick="openWeb()" id="courseWebBtn">Open Website</button>
+                <button class="btn" onclick="togglePlayed()">Mark Played</button>
+            </div>
+            
+            <div style="margin-top: 12px;">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="playedCheckbox" onchange="togglePlayed()">
+                    <label for="playedCheckbox">Mark as played</label>
+                </div>
+            </div>
+            
+            <div class="info-divider"></div>
+            
+            <div style="margin-top: 12px;">
+                <div class="filter-label" style="margin-bottom: 8px;">Rate this course</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <input type="range" id="ratingSlider" min="0" max="10" value="0" onchange="updateRating()" style="flex: 1; cursor: pointer;">
+                    <span id="ratingValue" style="font-size: 14px; font-weight: 600; color: var(--accent); min-width: 30px; text-align: center;">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const golfData = [{"id": 1, "name": "Čeladná", "holes": 36, "region": "Moravskoslezský", "location": "T – Čeladná", "lat": 49.531389, "lng": 18.326944, "web": "https://www.prosper-golf.cz", "rating": 8}, {"id": 2, "name": "Konopiště", "holes": 36, "region": "Středočeský", "location": "S – Benešov", "lat": 49.75, "lng": 14.632778, "web": "https://www.gcko.cz", "rating": 9}, {"id": 3, "name": "Brno Kaskáda", "holes": 27, "region": "Brno", "location": "B – Kuřim", "lat": 49.279444, "lng": 16.526111, "web": "https://www.golfbrno.cz", "rating": 7}, {"id": 4, "name": "Darovanský dvůr", "holes": 27, "region": "Plzeňský", "location": "P – Břasy", "lat": 49.833056, "lng": 13.526389, "web": "https://www.darovanskydvur.cz", "rating": 8}, {"id": 5, "name": "Karlštejn", "holes": 27, "region": "Středočeský", "location": "S – Liteň", "lat": 49.919444, "lng": 14.164444, "web": "https://www.karlstejn-golf.cz", "rating": 8}, {"id": 6, "name": "Albatross", "holes": 18, "region": "Středočeský", "location": "S – Vysoký Újezd", "lat": 49.995278, "lng": 14.202222, "web": "https://www.albatross.cz", "rating": 7}, {"id": 7, "name": "Alfrédov", "holes": 18, "region": "Plzeňský", "location": "P – Kostelec u Stříbra", "lat": 49.684722, "lng": 13.030556, "web": "https://www.alfredov.cz", "rating": 6}, {"id": 8, "name": "Austerlitz", "holes": 18, "region": "Brno", "location": "B – Slavkov u Brna", "lat": 49.155833, "lng": 16.871944, "web": "https://www.agrt.cz", "rating": 7}, {"id": 9, "name": "Barbora", "holes": 18, "region": "Ústecký", "location": "U – Jeníkov", "lat": 50.638056, "lng": 13.746667, "web": "https://www.golfbarbora.cz", "rating": 6}, {"id": 10, "name": "Benátky", "holes": 18, "region": "Středočeský", "location": "S – Benátky nad Jizerou", "lat": 50.268611, "lng": 14.874444, "web": "https://www.benatky-golf.cz", "rating": 7}, {"id": 11, "name": "Beroun", "holes": 18, "region": "Středočeský", "location": "S – Beroun", "lat": 49.975278, "lng": 14.087222, "web": "https://www.golfberoun.cz", "rating": 8}, {"id": 12, "name": "Beřovice", "holes": 18, "region": "Středočeský", "location": "S – Beřovice", "lat": 50.269167, "lng": 14.126944, "web": "https://www.gcbr.cz", "rating": 6}, {"id": 13, "name": "Casa Serena", "holes": 18, "region": "Středočeský", "location": "S – Roztěž", "lat": 49.911667, "lng": 15.194722, "web": "https://www.casaserena.cz", "rating": 9}, {"id": 14, "name": "Cihelny", "holes": 18, "region": "Karlovarský", "location": "K – Bečov nad Teplou", "lat": 50.178611, "lng": 12.840278, "web": "https://www.golfresortcihelny.cz", "rating": 8}, {"id": 15, "name": "Černý Most – Black Bridge Resort", "holes": 18, "region": "Praha", "location": "A – Praha 9 – D. Počernice", "lat": 50.092778, "lng": 14.586678, "web": "https://www.grcm.cz", "rating": 7}, {"id": 16, "name": "Čertovo Břemeno", "holes": 18, "region": "Jihočeský", "location": "C – Jistebnice", "lat": 49.527778, "lng": 14.521667, "web": "https://www.cebr.cz", "rating": 8}, {"id": 17, "name": "Česká Lípa", "holes": 18, "region": "Liberecký", "location": "L – Pihel", "lat": 50.715067, "lng": 14.548364, "web": "https://www.gccl.cz", "rating": 6}, {"id": 18, "name": "Český Krumlov", "holes": 18, "region": "Jihočeský", "location": "C – Velešín", "lat": 48.8275, "lng": 14.364167, "web": "https://www.gcceskykrumlov.cz", "rating": 9}, {"id": 19, "name": "Františkovy Lázně – Hazlov", "holes": 18, "region": "Karlovarský", "location": "K – Hazlov", "lat": 50.166111, "lng": 12.275833, "web": "https://www.gr-fl.cz", "rating": 7}, {"id": 20, "name": "Greensgate Dýšina", "holes": 18, "region": "Plzeňský", "location": "P – Dýšina", "lat": 49.7725, "lng": 13.504722, "web": "https://www.greensgate.cz", "rating": 8}, {"id": 21, "name": "Hluboká", "holes": 18, "region": "Jihočeský", "location": "C - Hluboká nad Vltavou", "lat": 49.048333, "lng": 14.441944, "web": "https://www.golfhluboka.cz", "rating": 9}, {"id": 22, "name": "Karlovy Vary", "holes": 18, "region": "Karlovarský", "location": "K – Karlovy Vary", "lat": 50.211389, "lng": 12.928889, "web": "https://www.golfresort.cz", "rating": 7}, {"id": 23, "name": "Kořenec", "holes": 18, "region": "Brno", "location": "B – Boskovice", "lat": 49.529444, "lng": 16.763889, "web": "https://www.sokrates-golf.cz", "rating": 6}, {"id": 24, "name": "Kravaře", "holes": 18, "region": "Moravskoslezský", "location": "T – Kravaře", "lat": 49.930278, "lng": 17.999167, "web": "https://www.zgck.cz", "rating": 7}, {"id": 25, "name": "Kunětická Hora", "holes": 18, "region": "Pardubický", "location": "E – Dříteč", "lat": 50.111944, "lng": 15.819444, "web": "https://www.gckh.cz", "rating": 8}, {"id": 26, "name": "Kynžvart", "holes": 18, "region": "Karlovarský", "location": "K – Lázně Kynžvart", "lat": 50.003611, "lng": 12.608333, "web": "https://www.golfkynzvart.cz", "rating": 7}, {"id": 27, "name": "Liberec", "holes": 18, "region": "Liberecký", "location": "L – Liberec-Machnín", "lat": 50.789444, "lng": 15.014167, "web": "https://www.gc-liberec.cz", "rating": 6}, {"id": 28, "name": "Loreta Golf Pyšely", "holes": 18, "region": "Středočeský", "location": "S – Pyšely", "lat": 49.867036, "lng": 14.672756, "web": "https://www.loretagolf.cz", "rating": 8}, {"id": 29, "name": "Malevil", "holes": 18, "region": "Liberecký", "location": "L – Jablonné v Podještědí", "lat": 50.799167, "lng": 14.7125, "web": "https://www.malevil.cz", "rating": 7}, {"id": 30, "name": "Mariánské Lázně", "holes": 18, "region": "Karlovarský", "location": "K – Mariánské Lázně", "lat": 49.976389, "lng": 12.735278, "web": "https://www.golfml.cz", "rating": 8}, {"id": 31, "name": "Mladá Boleslav", "holes": 18, "region": "Středočeský", "location": "S – Mladá Boleslav", "lat": 50.435556, "lng": 14.881944, "web": "https://www.golfmladaboleslav.cz", "rating": 6}, {"id": 32, "name": "Mladé Buky", "holes": 18, "region": "Hradecký", "location": "H – Mladé Buky", "lat": 50.598889, "lng": 15.8325, "web": "https://www.golf-mladebuky.cz", "rating": 7}, {"id": 33, "name": "Mnich", "holes": 18, "region": "Jihočeský", "location": "C – Nová Bystřice", "lat": 49.013333, "lng": 15.091667, "web": "https://www.golfmonachus.cz", "rating": 9}, {"id": 34, "name": "Molitorov", "holes": 18, "region": "Středočeský", "location": "S – Kouřim", "lat": 49.997222, "lng": 14.958611, "web": "https://www.golfmolitorov.cz", "rating": 7}, {"id": 35, "name": "Mstětice", "holes": 18, "region": "Středočeský", "location": "S – Praha – Východ", "lat": 50.144167, "lng": 14.692222, "web": "https://www.golfmstetice.cz", "rating": 6}, {"id": 36, "name": "Myštěves", "holes": 18, "region": "Hradecký", "location": "H – Myštěves", "lat": 50.311667, "lng": 15.557778, "web": "https://www.golf-mysteves.cz", "rating": 8}, {"id": 37, "name": "Olomouc", "holes": 18, "region": "Olomoucký", "location": "M – Olomouc", "lat": 49.666111, "lng": 17.357778, "web": "https://www.golf-olomouc.cz", "rating": 7}, {"id": 38, "name": "Ostravice", "holes": 18, "region": "Moravskoslezský", "location": "T – Ostravice", "lat": 49.550278, "lng": 18.362222, "web": "https://www.golf-ostravice.cz", "rating": 6}, {"id": 39, "name": "Panorama golf Kácov", "holes": 18, "region": "Středočeský", "location": "S – Kácov", "lat": 49.769822, "lng": 15.016519, "web": "https://www.panoramagolf.cz", "rating": 8}, {"id": 40, "name": "Pardubice – Lázně Bohdaneč", "holes": 18, "region": "Pardubický", "location": "E – Lázně Bohdaneč", "lat": 50.083889, "lng": 15.691111, "web": "https://www.gcpa.cz", "rating": 7}, {"id": 41, "name": "Písek – Kestřany", "holes": 18, "region": "Jihočeský", "location": "C – Písek", "lat": 49.283611, "lng": 14.080278, "web": "https://www.golfresortpisek.cz", "rating": 8}, {"id": 42, "name": "Poděbrady", "holes": 18, "region": "Středočeský", "location": "S – Poděbrady", "lat": 50.139444, "lng": 15.144167, "web": "https://www.golfpodebrady.cz", "rating": 7}, {"id": 43, "name": "Ropice", "holes": 18, "region": "Moravskoslezský", "location": "T – Ropice", "lat": 49.7, "lng": 18.6, "web": "https://www.beskydgolf.com", "rating": 6}, {"id": 44, "name": "Slapy", "holes": 18, "region": "Středočeský", "location": "S – Slapy nad Vltavou", "lat": 49.816111, "lng": 14.404444, "web": "https://www.golfslapy.cz", "rating": 9}, {"id": 45, "name": "Sokolov", "holes": 18, "region": "Karlovarský", "location": "K – Dolní Rychnov", "lat": 50.160833, "lng": 12.666944, "web": "https://www.golf-sokolov.cz", "rating": 6}, {"id": 46, "name": "Šilheřovice", "holes": 18, "region": "Moravskoslezský", "location": "T – Šilheřovice", "lat": 49.927778, "lng": 18.276111, "web": "https://www.golf-ostrava.cz", "rating": 7}, {"id": 47, "name": "Telč", "holes": 18, "region": "Jihlavský", "location": "J - Telč", "lat": 49.2125, "lng": 15.424722, "web": "https://www.czgolf.cz/golf-resort-telc", "rating": 8}, {"id": 48, "name": "Terasy Ústí nad Labem", "holes": 18, "region": "Ústecký", "location": "U – Ústí nad Labem", "lat": 50.697222, "lng": 13.989167, "web": "https://www.golfusti.cz", "rating": 7}, {"id": 49, "name": "Ypsilon Golf Resort", "holes": 18, "region": "Liberecký", "location": "L – Liberec", "lat": 50.8175, "lng": 15.066111, "web": "https://www.ygolf.cz", "rating": 8}, {"id": 50, "name": "Zbraslav", "holes": 18, "region": "Praha", "location": "A – Praha 5 – Zbraslav", "lat": 49.971389, "lng": 14.372778, "web": "https://www.praguecitygolf.cz", "rating": 8}, {"id": 51, "name": "Bechyně", "holes": 9, "region": "Jihočeský", "location": "C – Sudoměřice u Bechyně", "lat": 49.290556, "lng": 14.562778, "web": "https://www.golf-bechyne.cz", "rating": 6}, {"id": 52, "name": "Bitozeves", "holes": 9, "region": "Ústecký", "location": "U – Louny", "lat": 50.37, "lng": 13.645556, "web": "https://www.golfbitozeves.cz", "rating": 5}, {"id": 53, "name": "Botanika", "holes": 9, "region": "Středočeský", "location": "S – Unhošť", "lat": 50.0825, "lng": 14.081111, "web": "https://www.golfbotanika.cz", "rating": 6}, {"id": 54, "name": "Brno Automotodrom", "holes": 9, "region": "Brno", "location": "B – Brno", "lat": 49.206389, "lng": 16.453056, "web": "https://www.grb.cz", "rating": 5}, {"id": 55, "name": "Búřov", "holes": 9, "region": "Zlínský", "location": "Z – Valašská Bystřice", "lat": 49.409167, "lng": 18.099167, "web": "https://www.golfburov.cz", "rating": 6}, {"id": 56, "name": "Grabštejn", "holes": 9, "region": "Liberecký", "location": "L – Chrastava", "lat": 50.841944, "lng": 14.880833, "web": "https://www.gcg.cz", "rating": 5}, {"id": 57, "name": "Grosshof", "holes": 9, "region": "Hradecký", "location": "H – Broumov", "lat": 50.576789, "lng": 16.342689, "web": "https://www.grosshof.cz", "rating": 6}, {"id": 58, "name": "Háje", "holes": 9, "region": "Karlovarský", "location": "K – Karlovy Vary", "lat": 50.184167, "lng": 12.882028, "web": "https://www.golfhaje.com", "rating": 6}, {"id": 59, "name": "Harrachov", "holes": 9, "region": "Liberecký", "location": "L – Harrachov", "lat": 50.770833, "lng": 15.3925, "web": "https://www.golf-harrachov.cz", "rating": 7}, {"id": 60, "name": "Hodkovičky", "holes": 9, "region": "Praha", "location": "A – Praha 4", "lat": 50.025833, "lng": 14.402222, "web": "https://www.hodkovicky.cz", "rating": 5}, {"id": 61, "name": "Holešov", "holes": 9, "region": "Zlínský", "location": "Z – Žopy u Holešova", "lat": 49.331111, "lng": 17.616944, "web": "https://www.gkhol.cz", "rating": 6}, {"id": 62, "name": "Hořehledy", "holes": 9, "region": "Plzeňský", "location": "P – Spálené Poříčí", "lat": 49.606111, "lng": 13.656944, "web": "https://www.golf-horehledy.cz", "rating": 6}, {"id": 63, "name": "Hostivař", "holes": 9, "region": "Praha", "location": "A – Praha 10", "lat": 50.046667, "lng": 14.550278, "web": "https://www.golfhostivar.cz", "rating": 5}, {"id": 64, "name": "Hradec Králové – Roudnička", "holes": 9, "region": "Hradecký", "location": "H – Hradec Králové", "lat": 50.174722, "lng": 15.829444, "web": "https://www.parkgolf.cz", "rating": 6}, {"id": 65, "name": "Hrádek", "holes": 9, "region": "Hradecký", "location": "H – Nechanice", "lat": 50.225556, "lng": 15.668611, "web": "https://www.golfhradek.cz", "rating": 6}, {"id": 66, "name": "Hukvaldy", "holes": 9, "region": "Moravskoslezský", "location": "T – Hukvaldy", "lat": 49.616944, "lng": 18.214722, "web": "https://www.golfhukvaldy.cz", "rating": 7}, {"id": 67, "name": "Janov", "holes": 9, "region": "Ústecký", "location": "U – Arnoltice", "lat": 50.859444, "lng": 14.269722, "web": "https://www.golfjanov.cz", "rating": 5}, {"id": 68, "name": "Ještěd", "holes": 9, "region": "Liberecký", "location": "L – Světlá pod Ještědem", "lat": 50.702222, "lng": 14.975278, "web": "https://www.golfjested.cz", "rating": 8}, {"id": 69, "name": "Jezera – Ostrožská Nová Ves", "holes": 9, "region": "Zlínský", "location": "Z – Ostrožská Nová Ves", "lat": 49.011328, "lng": 17.437761, "web": "https://www.golf-jezera.cz", "rating": 6}, {"id": 70, "name": "Komárno", "holes": 9, "region": "Zlínský", "location": "Z – Komárno", "lat": 49.434444, "lng": 17.776944, "web": "https://example.com", "rating": 5}, {"id": 71, "name": "Kotlina", "holes": 9, "region": "Ústecký", "location": "U – Terezín", "lat": 50.513889, "lng": 14.142778, "web": "https://www.mtgc.cz", "rating": 6}, {"id": 72, "name": "Libouchec", "holes": 9, "region": "Ústecký", "location": "U – Libouchec", "lat": 50.755556, "lng": 14.036667, "web": "https://www.golf-club-libouchec.cz", "rating": 6}, {"id": 73, "name": "Lipiny", "holes": 9, "region": "Moravskoslezský", "location": "T – Karviná – Fryštát", "lat": 49.848333, "lng": 18.516389, "web": "https://www.golflipiny.cz", "rating": 6}, {"id": 74, "name": "Líšnice", "holes": 9, "region": "Středočeský", "location": "S – Mníšek pod Brdy", "lat": 49.894722, "lng": 14.326111, "web": "https://www.gkl.cz", "rating": 5}, {"id": 75, "name": "Luby", "holes": 9, "region": "Karlovarský", "location": "K – Luby u Chebu", "lat": 50.263056, "lng": 12.387778, "web": "https://www.golfluby.cz", "rating": 6}, {"id": 76, "name": "Most", "holes": 9, "region": "Ústecký", "location": "U – Most", "lat": 50.4775, "lng": 13.649167, "web": "https://www.golfmost.cz", "rating": 5}, {"id": 77, "name": "Na Vrších", "holes": 9, "region": "Hradecký", "location": "H – Třebechovice p. Orebem", "lat": 50.235556, "lng": 15.974444, "web": "https://www.gcnavrsich.cz", "rating": 6}, {"id": 78, "name": "Nebeská Rybná", "holes": 9, "region": "Hradecký", "location": "H – Nebeská Rybná", "lat": 50.1898, "lng": 16.4202, "web": "https://www.golfnebeska.cz", "rating": 6}, {"id": 79, "name": "Nová Bystřice Mnich", "holes": 9, "region": "Jihočeský", "location": "C – Nová Bystřice", "lat": 49.013333, "lng": 15.091667, "web": "https://www.golfmonachus.cz", "rating": 7}, {"id": 80, "name": "Osyčina", "holes": 9, "region": "Pardubický", "location": "E – Vysoké Mýto", "lat": 50.005278, "lng": 16.1375, "web": "https://www.gko.cz", "rating": 5}, {"id": 81, "name": "Podbořánky", "holes": 9, "region": "Středočeský", "location": "S – Jesenice", "lat": 50.051944, "lng": 13.447222, "web": "https://www.golfpark.cz", "rating": 6}, {"id": 82, "name": "Praha – Motol", "holes": 9, "region": "Praha", "location": "A – Praha 5 – Motol", "lat": 50.065556, "lng": 14.340833, "web": "https://www.gcp.cz", "rating": 5}, {"id": 83, "name": "Prosečné", "holes": 9, "region": "Hradecký", "location": "H – Prosečné", "lat": 50.568889, "lng": 15.678333, "web": "https://www.gccprosecne.cz", "rating": 6}, {"id": 84, "name": "Racing Karlovy Vary", "holes": 9, "region": "Karlovarský", "location": "K – Karlovy Vary", "lat": 50.225278, "lng": 12.835278, "web": "https://example.com", "rating": 5}, {"id": 85, "name": "Radíkov", "holes": 9, "region": "Olomoucký", "location": "M – Hranice", "lat": 49.5975, "lng": 17.662222, "web": "http://www.golf-radikov.cz", "rating": 6}, {"id": 86, "name": "Rožnov p. Radhoštěm", "holes": 9, "region": "Zlínský", "location": "Z – Rožnov pod Radhoštěm", "lat": 49.467778, "lng": 18.172778, "web": "https://www.golf-roznov.cz", "rating": 6}, {"id": 87, "name": "Semily", "holes": 9, "region": "Liberecký", "location": "L – Semily", "lat": 50.6, "lng": 15.356944, "web": "https://www.gcsemily.cz", "rating": 5}, {"id": 88, "name": "Slušovice", "holes": 9, "region": "Zlínský", "location": "Z – Slušovice", "lat": 49.255556, "lng": 17.8, "web": "https://www.dgcs.cz", "rating": 6}, {"id": 89, "name": "Srbsko", "holes": 9, "region": "Ústecký", "location": "U – Terezín", "lat": 50.513889, "lng": 14.142778, "web": "https://www.relevant.cz", "rating": 5}, {"id": 90, "name": "Stará Boleslav", "holes": 9, "region": "Středočeský", "location": "S – Brandýs n. L. – St. Boleslav", "lat": 50.208611, "lng": 14.659722, "web": "https://www.gcsb.cz", "rating": 6}, {"id": 91, "name": "Svobodné Hamry", "holes": 9, "region": "Pardubický", "location": "E – Hlinsko v Čechách", "lat": 49.771944, "lng": 15.831944, "web": "https://www.gccsh.cz", "rating": 6}, {"id": 92, "name": "Svratka", "holes": 9, "region": "Jihlavský", "location": "J – Svratka", "lat": 49.714167, "lng": 16.051667, "web": "https://www.gcsvr1932.cz", "rating": 7}, {"id": 93, "name": "Štiřín", "holes": 9, "region": "Středočeský", "location": "S – Štiřín", "lat": 49.915556, "lng": 14.601944, "web": "https://www.rgc.cz", "rating": 5}, {"id": 94, "name": "Teplá", "holes": 9, "region": "Karlovarský", "location": "K – Klášter Teplá", "lat": 49.964444, "lng": 12.884722, "web": "https://www.golftepla.cz", "rating": 6}, {"id": 95, "name": "Teplice – Cínovec", "holes": 9, "region": "Ústecký", "location": "U – Dubí", "lat": 50.729167, "lng": 13.753333, "web": "https://www.golf-teplice.cz", "rating": 6}, {"id": 96, "name": "Těšetice", "holes": 9, "region": "Brno", "location": "B – Prosiměřice", "lat": 48.895, "lng": 16.143889, "web": "https://www.golf-ares.cz", "rating": 6}, {"id": 97, "name": "DOLNÍ Dobrouč", "holes": 9, "region": "Pardubický", "location": "E – Hnátnice – Ústí n. Orlicí", "lat": 50.002222, "lng": 16.455833, "web": "https://www.gcu.cz", "rating": 5}, {"id": 98, "name": "Velké Karlovice – Horal", "holes": 9, "region": "Zlínský", "location": "Z – Velké Karlovice", "lat": 49.376667, "lng": 18.3925, "web": "https://www.valachy.cz/aktuality/golf-beskydy.aspx", "rating": 7}, {"id": 99, "name": "Zlín", "holes": 9, "region": "Zlínský", "location": "Z – Zlín 12 – Kostelec", "lat": 49.255, "lng": 17.6975, "web": "https://www.gclk.cz", "rating": 6}, {"id": 100, "name": "Krásný Dvůr", "holes": 6, "region": "Ústecký", "location": "U – Krásný Dvůr – Brody", "lat": 50.242925, "lng": 13.355242, "web": "https://www.golfkd.cz", "rating": 5}, {"id": 101, "name": "Kšírovka", "holes": 6, "region": "Brno", "location": "B – Brno", "lat": 49.169089, "lng": 16.618706, "web": "https://www.ksirovka.cz", "rating": 5}, {"id": 102, "name": "Úholičky – Snail golf", "holes": 6, "region": "Středočeský", "location": "S – Úholičky", "lat": 50.173411, "lng": 14.339864, "web": "https://www.golfsnail.cz", "rating": 5}, {"id": 103, "name": "Yard Resort – Předboj", "holes": 6, "region": "Středočeský", "location": "S – Předboj", "lat": 50.223333, "lng": 14.475833, "web": "https://www.yardresort.cz", "rating": 6}, {"id": 108, "name": "Město Albrechtice", "holes": 6, "region": "Olomoucký", "location": "M – Město Albrechtice", "lat": 50.164636, "lng": 17.569597, "web": "https://www.gcma.cz", "rating": 5}, {"id": 109, "name": "Příseka, Jihlava", "holes": 3, "region": "Jihlavský", "location": "J – Jihlava", "lat": 49.337778, "lng": 15.653611, "web": "https://www.golf-jihlava.cz", "rating": 4}, {"id": 121, "name": "Třímany", "holes": 18, "region": "Středočeský", "location": "S – Třímany", "lat": 49.94, "lng": 13.6075, "web": "https://example.com", "rating": 7}];
+
+        const playedCourses = new Set();
+        const courseRatings = {};
+        let currentFilter = 'all';
+        let markers = {};
+        
+        const map = L.map('map').setView([49.8, 15.4], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        function init() {
+            const saved = localStorage.getItem('playedCourses');
+            if (saved) {
+                saved.split(',').forEach(id => playedCourses.add(parseInt(id)));
+            }
+            
+            const savedRatings = localStorage.getItem('courseRatings');
+            if (savedRatings) {
+                try {
+                    const parsed = JSON.parse(savedRatings);
+                    Object.assign(courseRatings, parsed);
+                } catch (e) {
+                    console.error('Error loading ratings:', e);
+                }
+            }
+            
+            addMarkers();
+            updateStats();
+            
+            document.getElementById('searchInput').addEventListener('input', filterCourses);
+            document.querySelectorAll('.filter-tab').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFilter = e.target.dataset.filter;
+                    updateMarkers();
+                });
+            });
+        }
+
+        function getColor(courseId) {
+            return playedCourses.has(courseId) ? '#3fb950' : '#f85149';
+        }
+
+        function addMarkers() {
+            golfData.forEach(course => {
+                const rating = courseRatings[course.id] || 0;
+                const ratingPercent = rating > 0 ? (rating * 10) + '%' : '';
+                
+                const marker = L.circleMarker([course.lat, course.lng], {
+                    radius: 6,
+                    color: 'rgba(0, 0, 0, 0.3)',
+                    weight: 1.5,
+                    fill: true,
+                    fillOpacity: 0.9,
+                    fillColor: getColor(course.id)
+                }).addTo(map);
+                
+                marker.bindPopup(`<div style="font-size: 12px; color: var(--text-primary);"><strong>${course.name}</strong><br>${course.region}<br>${course.holes} holes${ratingPercent ? '<br>Rating: ' + ratingPercent : ''}</div>`);
+                
+                marker.on('click', () => showCourseInfo(course));
+                markers[course.id] = marker;
+            });
+        }
+
+        function updateMarkers() {
+            golfData.forEach(course => {
+                const marker = markers[course.id];
+                if (!marker) return;
+
+                let visible = true;
+                const fillColor = getColor(course.id);
+
+                if (currentFilter === 'played') visible = playedCourses.has(course.id);
+                if (currentFilter === 'unplayed') visible = !playedCourses.has(course.id);
+
+                marker.setStyle({ fillColor });
+                marker.setOpacity(visible ? 0.9 : 0.15);
+            });
+        }
+
+        function showCourseInfo(course) {
+            currentCourse = course;
+            const isPlayed = playedCourses.has(course.id);
+            const rating = courseRatings[course.id] || 0;
+            
+            document.getElementById('courseName').textContent = course.name;
+            document.getElementById('courseHoles').textContent = course.holes;
+            document.getElementById('courseRegion').textContent = course.region;
+            document.getElementById('courseLocation').textContent = course.location;
+            document.getElementById('courseWebLink').textContent = course.web;
+            document.getElementById('courseWebLink').href = course.web;
+            document.getElementById('courseWebBtn').href = course.web;
+            document.getElementById('playedCheckbox').checked = isPlayed;
+            document.getElementById('ratingSlider').value = rating;
+            
+            // Update rating display
+            if (rating === 0) {
+                document.getElementById('ratingValue').textContent = '-';
+            } else {
+                document.getElementById('ratingValue').textContent = rating + '/10';
+            }
+            
+            // Show sidebar and info panel
+            document.getElementById('sidebar').classList.add('visible');
+            document.getElementById('infoPanel').classList.add('active');
+        }
+
+        function closeInfo() {
+            document.getElementById('infoPanel').classList.remove('active');
+            document.getElementById('sidebar').classList.remove('visible');
+        }
+
+        function togglePlayed() {
+            if (!currentCourse) return;
+            
+            const isChecked = document.getElementById('playedCheckbox').checked;
+            if (isChecked) {
+                playedCourses.add(currentCourse.id);
+            } else {
+                playedCourses.delete(currentCourse.id);
+            }
+            
+            localStorage.setItem('playedCourses', Array.from(playedCourses).join(','));
+            
+            const marker = markers[currentCourse.id];
+            if (marker) {
+                marker.setStyle({ fillColor: getColor(currentCourse.id) });
+            }
+            
+            updateStats();
+        }
+
+        function openWeb() {
+            if (currentCourse) window.open(currentCourse.web, '_blank');
+        }
+
+        function updateRating() {
+            if (!currentCourse) return;
+            
+            const ratingValue = parseInt(document.getElementById('ratingSlider').value);
+            
+            if (ratingValue === 0) {
+                delete courseRatings[currentCourse.id];
+            } else {
+                courseRatings[currentCourse.id] = ratingValue;
+            }
+            
+            localStorage.setItem('courseRatings', JSON.stringify(courseRatings));
+            
+            // Update display in panel
+            if (ratingValue === 0) {
+                document.getElementById('ratingValue').textContent = '-';
+            } else {
+                document.getElementById('ratingValue').textContent = ratingValue + '/10';
+            }
+            
+            // Update marker popup
+            const marker = markers[currentCourse.id];
+            if (marker) {
+                const ratingPercent = ratingValue > 0 ? (ratingValue * 10) + '%' : '';
+                const popupText = `<div style="font-size: 12px; color: var(--text-primary);"><strong>${currentCourse.name}</strong><br>${currentCourse.region}<br>${currentCourse.holes} holes${ratingPercent ? '<br>Rating: ' + ratingPercent : ''}</div>`;
+                marker.setPopupContent(popupText);
+            }
+        }
+
+        function filterCourses(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            golfData.forEach(course => {
+                const marker = markers[course.id];
+                const matches = course.name.toLowerCase().includes(searchTerm) || 
+                               course.location.toLowerCase().includes(searchTerm) ||
+                               course.region.toLowerCase().includes(searchTerm);
+                marker.setOpacity(searchTerm && !matches ? 0.05 : 0.9);
+                if (matches && searchTerm) map.setView([course.lat, course.lng], 12);
+            });
+        }
+
+        function updateStats() {
+            const played = playedCourses.size;
+            const unplayed = golfData.length - played;
+            const total = golfData.length;
+            const playedPercent = total > 0 ? Math.round((played / total) * 100) : 0;
+            const unplayedPercent = 100 - playedPercent;
+            
+            document.getElementById('totalCourses').textContent = total;
+            document.getElementById('playedCourses').textContent = played;
+            document.getElementById('unplayedCourses').textContent = unplayed;
+            document.getElementById('playedPercent').textContent = playedPercent + '%';
+            document.getElementById('unplayedPercent').textContent = unplayedPercent + '%';
+            document.getElementById('playedPercentage').textContent = playedPercent + '%';
+        }
+
+        init();
+    </script>
+</body>
+</html>
