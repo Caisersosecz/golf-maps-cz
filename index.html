@@ -511,7 +511,7 @@
     <div id="map"></div>
     
     <!-- Left Sidebar -->
-    <div class="sidebar" id="sidebar"><div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:12px;color:var(--text-muted);"><span>=d <span id="currentUserName">...</span></span><button onclick="switchUser()" style="background:none;border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">Zmnit</button></div>
+    <div class="sidebar" id="sidebar"><div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:12px;color:var(--text-muted);"><span>👤 <span id="currentUserName">...</span></span><button onclick="switchUser()" style="background:none;border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">Změnit</button></div>
         <div class="sidebar-header">
             <h1>Golf Courses</h1>
             <p>Czech Republic</p>
@@ -622,7 +622,7 @@
                     <span id="ratingValue" style="font-size: 14px; font-weight: 600; color: var(--accent); min-width: 30px; text-align: center;">-</span>
                 </div>
                 <div style="margin-top: 10px;"><div class="filter-label" style="margin-bottom: 4px;">Datum odehr�n�</div><input type="date" id="playedDate" onchange="updateRating()" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); font-size: 13px;"></div>
-                <div style="margin-top: 10px;"><div class="filter-label" style="margin-bottom: 4px;">Pozn�mka</div><textarea id="courseNote" rows="2" onchange="updateRating()" placeholder="Vaae pozn�mka..." style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); font-size: 13px; resize: vertical; font-family: inherit;"></textarea></div>
+                <div style="margin-top: 10px;"><div class="filter-label" style="margin-bottom: 4px;">Pozn�mka</div><textarea id="courseNote" rows="2" onchange="updateRating()" placeholder="Vaše pozn�mka..." style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); font-size: 13px; resize: vertical; font-family: inherit;"></textarea></div>
             </div>
         </div>
     </div>
@@ -643,7 +643,7 @@
         }).addTo(map);
 
         function getCurrentUser() { let u=localStorage.getItem('currentUser'); if(!u){u=prompt('Zadejte sv� jm�no:')||'default';localStorage.setItem('currentUser',u);} return u; }
-        function switchUser() { const u=prompt('Jm�no u~ivatele:'); if(u&&u.trim()){localStorage.setItem('currentUser',u.trim());location.reload();} }
+        function switchUser() { const u=prompt('Jm�no uživatele:'); if(u&&u.trim()){localStorage.setItem('currentUser',u.trim());location.reload();} }
         function getStorageKey(k) { const u=getCurrentUser(); return u==='default'?k:k+'_'+u; }
         function init() {
             document.getElementById('currentUserName').textContent=getCurrentUser();
